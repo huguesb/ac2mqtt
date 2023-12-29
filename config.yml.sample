@@ -1,0 +1,38 @@
+# HCI device index for the bluetooth adapter to use. 0 by default, which should correspond to the hci0 device
+hci_index: 0
+
+homeassistant:
+  enabled: true
+
+# Publish the data to MQTT
+mqtt:
+  # Flag to enable or disable publishing the data to a MQTT server
+  enabled: true
+  # Interval at which to publish full state dump
+  # by default, only send updates when receiving changes from the controller
+  refresh_period: 15s
+  # MQTT broker url, including scheme (tcp, ssl or ws), hostname or IP address, and port
+  broker_url: tcp://localhost:1883
+  client_id: ac2mqtt
+  username: ac2mqtt
+  password: ac2mqtt
+  # Topic prefix where to publish
+  topic_prefix: ac2mqtt
+  # Topic where to publish LWT "status messages" on connect/disconnect. Empty means disabled.
+  # The default value for this is <topic_prefix>/status
+  #lwt_topic: ""
+  # Payload that will be published to lwt_topic when ac2mqtt connects
+  lwt_online_payload: '{"state":"online"}'
+  # Payload that will be published to lwt_topic when ac2mqtt disconnects
+  lwt_offline_payload: '{"state":"offline"}'
+
+# Logging options
+logging:
+  # Type can be either "structured", "json" or "simple"
+  type: simple
+  # Valid logging levels from most verbose to least verbose: trace, debug, info, warn, error, fatal, panic
+  level: info
+  # Include timestamp in the log line. Can be useful to turn off with certain logging systems which add their own timestamps
+  timestamps: true
+  # Whether to include the log caller in the logs. This will increase the size of logs but it helps in troubleshooting in some cases
+  with_caller: false

@@ -1,0 +1,10 @@
+[Unit]
+Description="AC infinity 2 MQTT"
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ac2mqtt -config /etc/ac2mqtt/config.yml
+
+[Install]
+WantedBy=multi-user.target
