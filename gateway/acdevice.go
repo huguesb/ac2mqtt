@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/go-ble/ble"
+	"github.com/huguesb/ble"
 	log "github.com/sirupsen/logrus"
 )
 

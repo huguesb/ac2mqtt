@@ -9,10 +9,10 @@ import (
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux"
-	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/huguesb/ac2mqtt/config"
+	"github.com/huguesb/ble"
+	"github.com/huguesb/ble/linux"
+	"github.com/huguesb/ble/linux/hci/cmd"
 	log "github.com/sirupsen/logrus"
 )
 
