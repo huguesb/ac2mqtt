@@ -15,18 +15,15 @@ type HomeAssistant struct {
 }
 
 type MQTT struct {
-	Enabled           *bool          `yaml:"enabled,omitempty"`
-	RefreshPeriod     *time.Duration `yaml:"refresh_period,omitempty"`
-	BrokerUrl         string         `yaml:"broker_url"`
-	BrokerAddress     string         `yaml:"broker_address"`
-	BrokerPort        int            `yaml:"broker_port"`
-	ClientID          string         `yaml:"client_id"`
-	Username          string         `yaml:"username"`
-	Password          string         `yaml:"password"`
-	TopicPrefix       string         `yaml:"topic_prefix"`
-	LWTTopic          *string        `yaml:"lwt_topic,omitempty"`
-	LWTOnlinePayload  string         `yaml:"lwt_online_payload"`
-	LWTOfflinePayload string         `yaml:"lwt_offline_payload"`
+	Enabled       *bool          `yaml:"enabled,omitempty"`
+	RefreshPeriod *time.Duration `yaml:"refresh_period,omitempty"`
+	BrokerUrl     string         `yaml:"broker_url"`
+	BrokerAddress string         `yaml:"broker_address"`
+	BrokerPort    int            `yaml:"broker_port"`
+	ClientID      string         `yaml:"client_id"`
+	Username      string         `yaml:"username"`
+	Password      string         `yaml:"password"`
+	TopicPrefix   string         `yaml:"topic_prefix"`
 }
 
 type Logging struct {

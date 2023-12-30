@@ -18,13 +18,6 @@ mqtt:
   password: ac2mqtt
   # Topic prefix where to publish
   topic_prefix: ac2mqtt
-  # Topic where to publish LWT "status messages" on connect/disconnect. Empty means disabled.
-  # The default value for this is <topic_prefix>/status
-  #lwt_topic: ""
-  # Payload that will be published to lwt_topic when ac2mqtt connects
-  lwt_online_payload: '{"state":"online"}'
-  # Payload that will be published to lwt_topic when ac2mqtt disconnects
-  lwt_offline_payload: '{"state":"offline"}'
 
 # Logging options
 logging:

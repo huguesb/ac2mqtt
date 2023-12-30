@@ -19,6 +19,7 @@ import (
 type mqttPub struct {
 	topic   string
 	payload []byte
+	retain  bool
 }
 
 type mqttState struct {
@@ -38,7 +39,7 @@ type Gateway struct {
 
 	mqtt atomic.Pointer[mqttState]
 
-	clients map[string]*ACDevice
+	devices map[string]*ACDevice
 }
 
 var GenericAccessUUID = ble.MustParse("1800")
@@ -65,7 +66,7 @@ var charMap = map[string]map[string]string{
 func NewGateway(config config.Config) *Gateway {
 	g := new(Gateway)
 	g.config = config
-	g.clients = make(map[string]*ACDevice)
+	g.devices = make(map[string]*ACDevice)
 	return g
 }
 
@@ -84,7 +85,7 @@ func mqttOptions(conf *config.MQTT) *mqtt.ClientOptions {
 	}
 	clientID := conf.ClientID
 	if clientID == "" {
-		clientID = "ac-2-mqtt"
+		clientID = "ac2mqtt"
 	}
 	opts := mqtt.NewClientOptions()
 	opts.SetCleanSession(false)
@@ -93,19 +94,9 @@ func mqttOptions(conf *config.MQTT) *mqtt.ClientOptions {
 	opts.SetUsername(conf.Username)
 	opts.SetPassword(conf.Password)
 	opts.SetKeepAlive(10 * time.Second)
-	opts.SetAutoReconnect(false)
+	opts.SetAutoReconnect(true)
 	opts.SetMaxReconnectInterval(10 * time.Second)
-	if conf.LWTTopic == nil || *conf.LWTTopic != "" {
-		topic := conf.TopicPrefix + "/status"
-		payload := conf.LWTOfflinePayload
-		if conf.LWTTopic != nil {
-			topic = *conf.LWTTopic
-		}
-		if payload == "" {
-			payload = "{\"state\":\"offline\"}"
-		}
-		opts.SetWill(topic, payload, 0, true)
-	}
+	opts.SetWill(conf.TopicPrefix+"/status", "offline", 0, true)
 	return opts
 }
 
@@ -132,31 +123,36 @@ func (g *Gateway) Start() context.Context {
 }
 
 func (g *Gateway) bleRetryLoop(ctx context.Context) {
+	delay := 10 * time.Millisecond
 	for {
-		err := g.bleScan(ctx)
-		if err == nil {
+		device, err := linux.NewDeviceWithName("default",
+			ble.OptDeviceID(g.config.HciIndex),
+			ble.OptScanParams(cmd.LESetScanParameters{
+				LEScanType:     0, // passive scan
+				LEScanInterval: 1000,
+			}))
+		if err != nil {
+			log.WithError(err).Error(fmt.Sprintf("BLE scan failed. Retrying in %v", delay))
+			time.Sleep(delay)
+			if delay*2 < time.Minute {
+				delay = delay * 2
+			}
+			continue
+		}
+		delay = 10 * time.Millisecond
+		ble.SetDefaultDevice(device)
+		g.ble = device
+		if err = ble.Scan(ctx, true, g.HandleAdvertisement, nil); err == nil {
 			break
 		}
-		log.WithError(err).WithFields(log.Fields{
-			"hci_index": g.config.HciIndex,
-		}).Error("BLE scan failed. Retrying...")
-		// TODO: capped exponential backoff?
+		log.WithError(err).Error("BLE scan failed. Retrying...")
+		// reset device list if needed
+		if len(g.devices) > 0 {
+			g.devices = make(map[string]*ACDevice)
+			g.publishDeviceList()
+		}
+		device.Stop()
 	}
-}
-
-func (g *Gateway) bleScan(ctx context.Context) error {
-	device, err := linux.NewDeviceWithName("default",
-		ble.OptDeviceID(g.config.HciIndex),
-		ble.OptScanParams(cmd.LESetScanParameters{
-			LEScanType:     0, // passive scan
-			LEScanInterval: 1000,
-		}))
-	if err != nil {
-		return err
-	}
-	ble.SetDefaultDevice(device)
-	g.ble = device
-	return ble.Scan(ctx, true, g.HandleAdvertisement, nil)
 }
 
 func (g *Gateway) mqttRetryLoop(ctx context.Context) {
@@ -183,19 +179,9 @@ func (g *Gateway) mqttConnect() *mqttState {
 		s.err <- token.Error()
 		return s
 	}
-	if g.config.MQTT.LWTTopic == nil || *g.config.MQTT.LWTTopic != "" {
-		topic := g.config.MQTT.TopicPrefix + "/status"
-		payload := g.config.MQTT.LWTOnlinePayload
-		if g.config.MQTT.LWTTopic != nil {
-			topic = *g.config.MQTT.LWTTopic
-		}
-		if payload == "" {
-			payload = "{\"state\":\"online\"}"
-		}
-		if token := client.Publish(topic, 0, true, payload); token.Wait() && token.Error() != nil {
-			s.err <- token.Error()
-			return s
-		}
+	if token := client.Publish(g.config.MQTT.TopicPrefix+"/status", 0, true, "online"); token.Wait() && token.Error() != nil {
+		s.err <- token.Error()
+		return s
 	}
 	s.c = client
 	g.mqtt.Store(s)
@@ -224,6 +210,8 @@ func (g *Gateway) mqttConnect() *mqttState {
 		go g.hassDiscoveryRefresh()
 	}
 
+	g.publishDeviceList()
+
 	go g.mqttPublisher(s)
 	go g.mqttReceiver(s)
 
@@ -234,7 +222,7 @@ func (g *Gateway) periodicStateDumper(ctx context.Context) {
 	for {
 		select {
 		case <-g.ticker.C:
-			for _, c := range g.clients {
+			for _, c := range g.devices {
 				c.sendStateDump()
 			}
 		case <-ctx.Done():
@@ -253,7 +241,7 @@ func (g *Gateway) mqttPublisher(s *mqttState) {
 		}
 
 		log.Debug("mqtt pub: ", p.topic, " ", string(p.payload))
-		token := s.c.Publish(p.topic, 0, false, p.payload)
+		token := s.c.Publish(p.topic, 0, p.retain, p.payload)
 		if token.Wait() && token.Error() != nil {
 			s.err <- token.Error()
 			break
@@ -280,7 +268,7 @@ func (g *Gateway) mqttReceiver(s *mqttState) {
 		id_and_maybe_port, cmd := path[0], path[1]
 		id_parts := strings.SplitN(id_and_maybe_port, "-", 2)
 		id := id_parts[0]
-		c, present := g.clients[id]
+		c, present := g.devices[id]
 		if !present {
 			log.Debug("Discard message for unknown device: ", id)
 			return
@@ -291,6 +279,10 @@ func (g *Gateway) mqttReceiver(s *mqttState) {
 }
 
 func (g *Gateway) publish(topic string, d interface{}) {
+	g.publishWithRetention(topic, false, d)
+}
+
+func (g *Gateway) publishWithRetention(topic string, retain bool, d interface{}) {
 	s := g.mqtt.Load()
 	if s == nil {
 		return
@@ -310,7 +302,7 @@ func (g *Gateway) publish(topic string, d interface{}) {
 		}
 	}
 
-	s.snd <- mqttPub{topic: topic, payload: payload}
+	s.snd <- mqttPub{topic: topic, payload: payload, retain: retain}
 }
 
 func (g *Gateway) withHass() bool {
@@ -328,7 +320,7 @@ func (g *Gateway) onHassStatus(client mqtt.Client, msg mqtt.Message) {
 }
 
 func (g *Gateway) hassDiscoveryRefresh() {
-	for _, c := range g.clients {
+	for _, c := range g.devices {
 		c.sendHassDiscoveryMessage()
 	}
 }
@@ -381,18 +373,24 @@ func (g *Gateway) onNewDevice(addr ble.Addr, scanData []byte) {
 	if c == nil {
 		return
 	}
-	g.clients[c.id] = c
+	g.devices[c.id] = c
 
-	if g.withHass() {
-		c.sendHassDiscoveryMessage()
-	}
+	c.sendHassDiscoveryMessage()
+
+	g.publishDeviceList()
 
 	// NB: block this goroutine until the BLE client disconnects
 	<-c.c.Disconnected()
 	log.Debug("disconnected ", mac)
-	delete(g.clients, c.id)
+	delete(g.devices, c.id)
 
-	if g.withHass() {
-		// TODO: send disappearance message?
+	g.publishDeviceList()
+}
+
+func (g *Gateway) publishDeviceList() {
+	devices := make(map[string]interface{})
+	for id, _ := range g.devices {
+		devices[id] = map[string]interface{}{}
 	}
+	g.publishWithRetention(g.config.MQTT.TopicPrefix+"/devices", true, devices)
 }

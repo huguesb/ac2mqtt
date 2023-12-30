@@ -337,7 +337,7 @@ func (c *ACDevice) publishStateDiff(prev, s *ACDeviceState) {
 				fanUpdate = append(fanUpdate, u)
 			}
 		}
-	} else {
+	} else if portTypeByResistance(int(s.fanType)) == Fan {
 		if prev == nil || prev.workType != s.workType || prev.fan != s.fan {
 			fanUpdate = append(fanUpdate, update{
 				// to handle workType other than 1 (off) and 2 (on)
@@ -390,6 +390,18 @@ func (c *ACDevice) publishStateDiff(prev, s *ACDeviceState) {
 	}
 }
 
+func (c *ACDevice) availability() []map[string]string {
+	return []map[string]string{
+		{"topic": c.gw.config.MQTT.TopicPrefix + "/status"},
+		{
+			"topic":                 c.gw.config.MQTT.TopicPrefix + "/devices",
+			"payload_available":     "True",
+			"payload_not_available": "False",
+			"value_template":        "{{ '" + c.id + "' in value_json }}",
+		},
+	}
+}
+
 func (c *ACDevice) sendFanDiscoveryMessage(id string) {
 	if !c.gw.withHass() {
 		return
@@ -411,9 +423,9 @@ func (c *ACDevice) sendFanDiscoveryMessage(id string) {
 		"spd_rng_min": 1,
 		"spd_rng_max": 10,
 		"qos":         0,
+		"avty_mode":   "all",
+		"avty":        c.availability(),
 	})
-
-	//c.gw.publish(topicPrefix+"/avail", "online")
 }
 
 func (c *ACDevice) clearFanConfig(id string) {
@@ -440,10 +452,14 @@ func (c *ACDevice) sendHassDiscoveryMessage() {
 		"identifiers":  c.id,
 	}
 
-	// TODO: figure out which devices have which sensors, and whether the sensors are working properly...
+	avail := c.availability()
 
+	// TODO: figure out which devices have which sensors, and whether the sensors are working properly...
+	// TODO: detect sensor loss and mark unavailable or remove entity entirely
 	c.gw.publish("homeassistant/sensor/"+c.id+"-tmp"+"/config", map[string]interface{}{
 		"uniq_id":                     "tmp-" + c.id,
+		"avty_mode":                   "all",
+		"avty":                        avail,
 		"dev":                         dev,
 		"dev_cla":                     "temperature",
 		"stat_cla":                    "measurement",
@@ -454,6 +470,8 @@ func (c *ACDevice) sendHassDiscoveryMessage() {
 
 	c.gw.publish("homeassistant/sensor/"+c.id+"-hum"+"/config", map[string]interface{}{
 		"uniq_id":                     "hum-" + c.id,
+		"avty_mode":                   "all",
+		"avty":                        avail,
 		"dev":                         dev,
 		"dev_cla":                     "humidity",
 		"stat_cla":                    "measurement",
@@ -464,6 +482,8 @@ func (c *ACDevice) sendHassDiscoveryMessage() {
 
 	c.gw.publish("homeassistant/sensor/"+c.id+"-vpd"+"/config", map[string]interface{}{
 		"uniq_id":             "vpd-" + c.id,
+		"avty_mode":           "all",
+		"avty":                avail,
 		"dev":                 dev,
 		"dev_cla":             "pressure",
 		"name":                "Vapour-Pressure Deficit",
@@ -472,7 +492,7 @@ func (c *ACDevice) sendHassDiscoveryMessage() {
 	})
 
 	if !isDeviceMultiPort(int(c.Type)) {
-		// TODO: check last state fanType to ensure this is actually a fan...
+		// TODO: is there actually a fan... how can we tell for single-port devices?
 		c.sendFanDiscoveryMessage(c.id)
 	}
 

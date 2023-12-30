@@ -117,24 +117,6 @@ func addInt16(d []byte, i int, j int) {
 	d[i+1] = byte(j & 0xff)
 }
 
-// Command packet format:
-//   - 2 bytes: header
-//   - 2 bytes: length of command payload
-//   - 2 bytes: sequence number
-//   - 2 bytes: CRC16 of 6 previous bytes
-//   - 1 byte: always 0x00
-//   - 1 byte: command category, sample values:
-//     -- 1: GET some value
-//     -- 3: SET some value
-//     -- 8: FACTORY RESET
-//   - actual command(s), possibly several in the same category, each with:
-//     -- 1 byte ID
-//     -- 1 byte payload length
-//     -- payload
-//   - optionally, for multi-port controllers:
-//     -- 1 byte: always 0xff
-//     -- 1 byte: port number
-//   - 2 bytes: CRC16 of everything after the previous CRC
 func cmdPacket(payload []byte, cmdType byte, seq int) []byte {
 	d := make([]byte, len(payload)+12)
 	copy(d, HEAD)
