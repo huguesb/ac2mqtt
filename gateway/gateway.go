@@ -381,7 +381,7 @@ func (g *Gateway) onNewDevice(addr ble.Addr, scanData []byte) {
 
 	// NB: block this goroutine until the BLE client disconnects
 	<-c.c.Disconnected()
-	log.Debug("disconnected ", mac)
+	log.Info("disconnected ", c.id, " ", mac)
 	delete(g.devices, c.id)
 
 	g.publishDeviceList()

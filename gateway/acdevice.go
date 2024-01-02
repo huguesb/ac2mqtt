@@ -248,12 +248,12 @@ func NewACDevice(g *Gateway, client ble.Client, scanData []byte) *ACDevice {
 	tmp := getShort(scanData, 14)
 	hum := getShort(scanData, 16)
 	fan := scanData[18]
-	log.Info(typeName, " ", isDegree, fanState, tmpState, humState, tmp, hum, fan)
+	log.Debug(typeName, " ", isDegree, fanState, tmpState, humState, tmp, hum, fan)
 	if c.Version >= 3 && isDeviceMultiPort(int(c.Type)) {
 		choosePort := scanData[19]
 		vpdState := getBits(scanData[20], 0, 2)
 		vpd := getShort(scanData, 21)
-		log.Info(choosePort, vpdState, vpd)
+		log.Debug(choosePort, vpdState, vpd)
 	}
 	// TODO: set initial state?
 
@@ -261,7 +261,7 @@ func NewACDevice(g *Gateway, client ble.Client, scanData []byte) *ACDevice {
 }
 
 func (c *ACDevice) HandleNotification(req []byte) {
-	log.Debug(fmt.Sprintf("notified: %x", req))
+	log.Trace(fmt.Sprintf("notified: %x", req))
 
 	if len(req) < 5 || !bytes.Equal(req[0:4], []byte{0x1e, 0xff, 0x02, 0x09}) {
 		return
@@ -281,7 +281,7 @@ func (c *ACDevice) HandleNotification(req []byte) {
 			s.FromNotif(req)
 		}
 
-		log.Debug(s.String())
+		log.Trace(s.String())
 		prev := c.latestState.Swap(&s)
 		c.publishStateDiff(prev, &s)
 	}
