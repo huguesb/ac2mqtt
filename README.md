@@ -24,6 +24,8 @@ Inspired by zigbee2mqtt, ruuvi-go-gateway and ruuvi-bridge, ac2mqtt is intended 
 
 Check [config.sample.yml](./config.sample.yml) for a sample config. By default the gateway assumes to find a file called `config.yml` in the current working directory, but that can be overridden with `-config /path/to/config.yml` command line flag.
 
+The systemd service file looks for a configuration file in `/etc/ac2mqtt/config.yml`
+
 ### Installation
 
 ```
