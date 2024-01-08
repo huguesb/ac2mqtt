@@ -9,12 +9,16 @@ Inspired by zigbee2mqtt, ruuvi-go-gateway and ruuvi-bridge, ac2mqtt is intended 
 - Publishes fan entities that support on/off switch and speed adjustment
 - Supports multi-port controllers
 
-### Requirements
+### Runtime Requirements
 
 - Linux-based OS
 - Bluetooth adapter supporting Bluetooth Low Energy
 - 10MB of disk space
 - ~20MB of RAM
+
+### Build Requirements
+
+- [Go](https://golang.org) 1.18+
 
 ### Configuration
 
