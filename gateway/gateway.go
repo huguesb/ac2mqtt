@@ -323,6 +323,8 @@ func (g *Gateway) hassDiscoveryRefresh() {
 	for _, c := range g.devices {
 		c.sendHassDiscoveryMessage()
 	}
+	// HomeAssistant sometimes doesn't respect the retained value on restart ?!?
+	g.publishWithRetention(g.config.MQTT.TopicPrefix+"/status", true, "online")
 }
 
 func (g *Gateway) onCommandMessage(client mqtt.Client, msg mqtt.Message) {
