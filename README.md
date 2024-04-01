@@ -38,3 +38,9 @@ Note that running the standalone binaries without root requires some extra capab
 ```sh
 sudo setcap 'cap_net_raw,cap_net_admin+eip' ./ac2mqtt
 ```
+
+### Troubleshooting
+
+**send ATT request failed: io: read/write on closed pipe, mac: xx:xx:xx:xx:xx:xx**
+    
+Your controller is discoverable, but currently connected to by another device, most likely your phone app. Close the app, and try again.
