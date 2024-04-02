@@ -340,7 +340,7 @@ func (g *Gateway) HandleAdvertisement(adv ble.Advertisement) {
 	// official AC infinity app filters by a 16bit id attached to the BLE
 	// manufacturer data field. Our BLE library doesn't extract it for us
 	// and instead leaves it at the start of the byte array
-	// Official Android App only recignizes two valid length for advertisement
+	// Official Android App only recognizes two valid length for advertisement
 	// packets, so we do the same filtering for robustness
 	// NB: could also filter by manufacturer MAC prefix: "34:85:18"
 	if (len(data) == 19 || len(data) == 29) &&
@@ -367,7 +367,11 @@ func (g *Gateway) onNewDevice(addr ble.Addr, scanData []byte) {
 	log.Trace("connected ", mac)
 
 	// same as AC infinity Android app...
-	client.ExchangeMTU(247)
+	_, err = client.ExchangeMTU(247)
+	if err != nil {
+		log.WithError(err).Warn("Can't exchange MTU with ", mac)
+		return
+	}
 	log.Trace("mtu exchanged ", mac)
 
 	// NB: this is responsible for creating BLE subscribe
